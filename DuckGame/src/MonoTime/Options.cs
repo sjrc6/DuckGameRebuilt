@@ -472,6 +472,10 @@ namespace DuckGame
             {
                 dgrDescription = "Tries to target a specific FPS value, set to 0 for unlimited FPS"
             });
+            menu.Add(new UIMenuItemToggle("Frame Stacking", field: new FieldBinding(typeof(DGRSettings), nameof(DGRSettings.UseFrameStacking)))
+            {
+                dgrDescription = "Cursed"
+            });
 
             menu.Add(new UIText(" ", Colors.DGPink) { scale = new Vec2(0.5f) });
 

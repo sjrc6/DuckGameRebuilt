@@ -135,6 +135,12 @@ namespace DuckGame
                         break;
                 }
                 MonoMain._screenCapture = new RenderTarget2D(current.x, current.y, true);
+
+                MonoMain.frameStackBuffer2 = new RenderTarget2D(current.x, current.y);
+                MonoMain.frameStackBuffer1 = new RenderTarget2D(current.x, current.y);
+                MonoMain.frameToBeStacked = new RenderTarget2D(current.x, current.y);
+                MonoMain.previousStackBuffer = new RenderTarget2D(current.x, current.y);
+
                 MonoMain.RetakePauseCapture();
                 LayerCore.ReinitializeLightingTargets();
                 Options.ResolutionChanged();

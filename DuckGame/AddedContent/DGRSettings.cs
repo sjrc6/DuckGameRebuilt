@@ -298,6 +298,11 @@ namespace DuckGame
                 };
             }
         }
+        //TODO: MAKE SETTING UI FOR THIS
+        [Marker.AutoConfig] public static bool UseFrameStacking = true;
+
+        //TODO: UGH THIS VALUE IS ANNOYING, IT SHOULD BE EXACTLY 30, 60, OR MONITOR REFRESH HZ.
+        [Marker.AutoConfig] public static int FrameStackTargetFPS = 60;
 
         [Marker.AutoConfig] public static bool UncappedFPS = false;
 

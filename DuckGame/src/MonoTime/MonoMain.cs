@@ -1888,6 +1888,7 @@ namespace DuckGame
                         if (!flag && UIMatchmakerMark2.instance == null)
                             _didPauseCapture = false;
                     }
+                    //REAL SHIT HAPPENS HERE ALMOST ALL THE TIME
                     else
                     {
                         if (autoPauseFade)
@@ -1895,11 +1896,90 @@ namespace DuckGame
                             _pauseMaterial.fade = 0f;
                             _pauseMaterial.dim = 0.6f;
                         }
-                        Graphics.SetRenderTarget(null);
-                        Level.DrawCurrentLevel();
-                        Graphics.screen.Begin(SpriteSortMode.FrontToBack, BlendState.AlphaBlend, SamplerState.PointClamp, DepthStencilState.Default, RasterizerState.CullNone, null, Resolution.getTransformationMatrix());
-                        OnDraw();
-                        Graphics.screen.End();
+                        if (!DGRSettings.UseFrameStacking)
+                        {
+                            Graphics.SetRenderTarget(null);
+                            Level.DrawCurrentLevel();
+                            Graphics.screen.Begin(SpriteSortMode.FrontToBack, BlendState.AlphaBlend, SamplerState.PointClamp, DepthStencilState.Default, RasterizerState.CullNone, null, Resolution.getTransformationMatrix());
+                            OnDraw();
+                            Graphics.screen.End();
+                        }
+                        //Frame stacking here
+                        //We can't write and read from the same texture so this is complicated
+
+                        //PsuedoCode:
+                        //1. Game (draw)-> frameToBeStacked
+                        //2. frameToBeStacked + frameStackBufferRead (draw)-> frameStackBufferWrite
+                        //3. frameStackBufferWrite (copy)-> frameStackBufferRead
+                        //4. if(monitor refresh happened) { frameStackBufferRead (copy)-> previousStackBuffer }
+                        //5. previousStackBuffer (draw)-> Monitor ((this could be copy I think), TODO: later) 
+
+                        //IS HOW IT WOULD WORK IF THERE WAS A WAY TO COPY RENDER TARGETS IN LESS THAN 10 YEARS??
+                        //NO GPU ONLY TEXTURE COPY??
+                        else
+                        {
+                            bool RefreshStack = UpdateLerpState;
+                            if (RefreshStack)
+                            {
+                                Graphics.SetRenderTarget(previousStackBuffer);
+                                Graphics.screen.Begin(SpriteSortMode.FrontToBack, BlendState.AlphaBlend, SamplerState.PointClamp, DepthStencilState.Default, RasterizerState.CullNone, null, Matrix.Identity);
+                                Graphics.Clear(Level.current.backgroundColor); //hopefully this isn't NULL lol
+                                if (BufferStackFlipFlop)
+                                {
+                                    Graphics.Draw(frameStackBuffer1, 0, 0, 1, 1);
+                                }
+                                else
+                                {
+                                    Graphics.Draw(frameStackBuffer2, 0, 0, 1, 1);
+                                }
+                                Graphics.screen.End();
+
+                                //previousStackBuffer.SetData(frameStackBufferRead.GetData());
+                            }
+                            if (RefreshStack)
+                            {
+                                framesStacked = 0;
+                            }
+
+                            Graphics.SetRenderTarget(frameToBeStacked);
+                            Level.DrawCurrentLevel();
+                            Graphics.screen.Begin(SpriteSortMode.FrontToBack, BlendState.AlphaBlend, SamplerState.PointClamp, DepthStencilState.Default, RasterizerState.CullNone, null, Resolution.getTransformationMatrix());
+                            OnDraw();
+                            Graphics.screen.End();
+
+                            if (BufferStackFlipFlop)
+                            {
+                                Graphics.SetRenderTarget(frameStackBuffer1);
+                                Graphics.device.Textures[1] = frameStackBuffer2;
+                            }
+                            else
+                            {
+                                Graphics.SetRenderTarget(frameStackBuffer2);
+                                Graphics.device.Textures[1] = frameStackBuffer1;
+                            }
+                            FrameStackMaterial frameMat = new FrameStackMaterial(framesStacked);
+
+                            Graphics.screen.Begin(SpriteSortMode.FrontToBack, BlendState.AlphaBlend, SamplerState.PointClamp, DepthStencilState.Default, RasterizerState.CullNone, null, Matrix.Identity);
+                            Graphics.Clear(Level.current.backgroundColor); //hopefully this isn't NULL lol
+                            Graphics.material = frameMat;
+                            Graphics.Draw(frameToBeStacked, 0, 0, 1, 1);
+                            Graphics.material = null;
+                            Graphics.screen.End();
+
+                            //3. Copy the result of the combined buffers back to the read buffer
+                            ////4. if the monitor refreshed then update the previous finished stack of frames
+                            //5. Draw whatever the previous buffer was to the screen now. I think we can just copy this directly to the screen buffer but idk where that is rn
+                            Graphics.SetRenderTarget(null);
+                            Graphics.screen.Begin(SpriteSortMode.FrontToBack, BlendState.AlphaBlend, SamplerState.PointClamp, DepthStencilState.Default, RasterizerState.CullNone, null, Matrix.Identity);
+                            //Graphics.Clear(Level.current.backgroundColor); //hopefully this isn't NULL lol
+                            Graphics.Draw(previousStackBuffer, 0, 0, 1, 1);
+                            Graphics.screen.End();
+
+                            //Graphics.SettingForShader = false;
+                            framesStacked++;
+                            BufferStackFlipFlop = !BufferStackFlipFlop;
+
+                        }
                         if (closeMenuUpdate.Count > 0)
                         {
                             Layer.HUD.Begin(true);
@@ -1919,7 +1999,15 @@ namespace DuckGame
                 }
             }
         }
+        //Putting it down here because I don't feel like scrolling up
+        private bool BufferStackFlipFlop = false;
+        public static RenderTarget2D frameStackBuffer2;
+        public static RenderTarget2D frameStackBuffer1;
 
+        public static RenderTarget2D frameToBeStacked;
+        public static RenderTarget2D previousStackBuffer;
+
+        private int framesStacked = 0;
         protected virtual void OnDraw()
         {
         }
